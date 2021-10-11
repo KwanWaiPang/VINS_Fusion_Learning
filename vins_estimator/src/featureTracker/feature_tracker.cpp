@@ -102,6 +102,9 @@ double FeatureTracker::distance(cv::Point2f &pt1, cv::Point2f &pt2)
 // cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);//改写
 //源码分析可以参考：https://blog.csdn.net/jaych/article/details/51203841
 // 也可能需要参考ESVO看如何对event做tracking了
+//time surface的数据形式为dvs_msgs::EventArray
+//arc*检测出来的corner_msg是dvs_msgs::EventArray 。两者是等效的。
+//关键看看esvo中如何做tracking
 void FeatureTracker::goodevent_FeaturesToTrack( InputArray image, OutputArray corners,
                                      int maxCorners, double qualityLevel, double minDistance,
                                      InputArray mask = noArray(), int blockSize = 3,
