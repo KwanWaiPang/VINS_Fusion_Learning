@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
     tf
     cv_bridge
     camera_models #ins-fusion里面定义的，实现了多种相机模型。
+    arc_star_ros###############
     image_transport)
 
 find_package(OpenCV REQUIRED)

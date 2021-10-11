@@ -19,6 +19,14 @@ find_package(OpenCV REQUIRED)
 find_package(Ceres REQUIRED)
 include_directories(${CERES_INCLUDE_DIRS})
 
+#################################
+# include_directories("/usr/include/eigen3")
+# # set(EIGEN_INCLUDE_DIR "/usr/include/eigen3")
+# include_directories("/usr/local/include/ceres")
+# set(CERES_LIBRARIES /usr/local/lib/libceres.a)
+# set(CERES_INCLUDE_DIRS "/usr/local/include/ceres")
+#####################################
+
 
 catkin_package(
     INCLUDE_DIRS include
