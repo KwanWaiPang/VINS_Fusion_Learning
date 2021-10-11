@@ -25,6 +25,7 @@ using namespace Eigen;
 #include "parameters.h"
 #include "../utility/tic_toc.h"
 
+//特征管理
 class FeaturePerFrame
 {
   public:

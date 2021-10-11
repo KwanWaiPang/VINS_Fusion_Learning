@@ -54,8 +54,11 @@ FeatureTracker::FeatureTracker()
 }
 
 //设置mask
-void FeatureTracker::setMask()
+void FeatureTracker::setMask()//按照track_cnt的大小从高到低排序
 {
+//将当前的特征点按照被连续跟踪的次数从高到低进行排序
+//设置mask，使得角点提取的时候分布均匀
+
     mask = cv::Mat(row, col, CV_8UC1, cv::Scalar(255));//mask被设置为更输入的图像一样大的Mat
 
     // prefer to keep features that are tracked for long time
@@ -80,7 +83,8 @@ void FeatureTracker::setMask()
             cur_pts.push_back(it.second.first);
             ids.push_back(it.second.second);
             track_cnt.push_back(it.first);
-            cv::circle(mask, it.second.first, MIN_DIST, 0, -1);
+            cv::circle(mask, it.second.first, MIN_DIST, 0, -1);//具体的set mask的操作主要在这
+            //画了一个圆，圆里面有MIN_DIST，就是特征点之间的最小距离。就是在这个最小范围内的区域，不再提取特征
         }
     }
 }
@@ -124,7 +128,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         vector<float> err;
         if(hasPrediction)//若已经进行了预测，则执行。（一开始是false的，只有当执行了setPrediction，才是true）
         {
-            cur_pts = predict_pts;
+            cur_pts = predict_pts;//若一开始有预测的点的话，就先用预测的点
             cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 1, 
             cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
             
@@ -132,10 +136,13 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             for (size_t i = 0; i < status.size(); i++)
             {
                 if (status[i])
-                    succ_num++;
+                    succ_num++;//看看可以成功跟踪到多少个点
             }
-            if (succ_num < 10)
+            if (succ_num < 10)//如果少于10个点，那么继续
                cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 3);
+               //里面的“3”是图像金字塔相关的参数。
+               //maxLevel ：基于0的最大金字塔等级数;如果设置为0，则不使用金字塔（单级），如果设置为1，则使用两个级别，
+               //依此类推;如果将金字塔传递给输入，那么算法将使用与金字塔一样多的级别，但不超过maxLevel。
         }
         else
             cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 3);//通过光流来计算。
@@ -178,7 +185,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     }
 
     for (auto &n : track_cnt)////每个特征点被连续追踪到的次数
-        n++;
+        n++;//上面已经追踪到了，把被追踪的次数++
 
     if (1)//每一帧都会执行的角点检测与跟踪
     {
@@ -220,7 +227,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         //printf("feature cnt after add %d\n", (int)ids.size());
     }
 
-//通过函数undistortedPts以及camera的模型。
+//通过函数undistortedPts以及camera的模型。进行去畸变。对单独的图像进行去畸变
 //对于event camera，可能就是camera[2],对于额外的camera需要怎么定义要仔细看清楚
     cur_un_pts = undistortedPts(cur_pts, m_camera[0]);//对当前检测到的角点进行去畸变的处理，得到当前帧在归一化平面上的特征点
     pts_velocity = ptsVelocity(ids, cur_un_pts, cur_un_pts_map, prev_un_pts_map);//特征点在成像平面上的速度
@@ -304,7 +311,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         velocity_y = pts_velocity[i].y;
 
         Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
-        xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
+        xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;//归一化平面上的点，成像平面上的点，成像平面上点的速度
         featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);//把特征点的信息都加进去
     }
 
@@ -529,7 +536,7 @@ void FeatureTracker::drawTrack(const cv::Mat &imLeft, const cv::Mat &imRight,
 
 
 void FeatureTracker::setPrediction(map<int, Eigen::Vector3d> &predictPts)
-{
+{//通过VIO估计器来设置预测的点
     hasPrediction = true;//只有当设置预测才会变为true
     predict_pts.clear();
     predict_pts_debug.clear();
