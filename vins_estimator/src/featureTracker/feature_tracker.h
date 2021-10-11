@@ -67,11 +67,15 @@ public:
     vector<cv::Point2f> n_pts;
     vector<cv::Point2f> predict_pts;
     vector<cv::Point2f> predict_pts_debug;
-    vector<cv::Point2f> prev_pts, cur_pts, cur_right_pts;
+    
+    //成像平面的特征点
+    vector<cv::Point2f> prev_pts, cur_pts, cur_right_pts;//上一帧的特征点，这一帧的特征点（左目），这一帧右目的特征点（双目的情况）
+    //归一化平面上的特征点。
     vector<cv::Point2f> prev_un_pts, cur_un_pts, cur_un_right_pts;
-    vector<cv::Point2f> pts_velocity, right_pts_velocity;
+//特征点在成像平面上的速度
+    vector<cv::Point2f> pts_velocity, right_pts_velocity;//（pixel/时间）
     vector<int> ids, ids_right;
-    vector<int> track_cnt;
+    vector<int> track_cnt;//每个特征点被连续追踪到的次数
     map<int, cv::Point2f> cur_un_pts_map, prev_un_pts_map;
     map<int, cv::Point2f> cur_un_right_pts_map, prev_un_right_pts_map;
     map<int, cv::Point2f> prevLeftPtsMap;

@@ -281,6 +281,9 @@ int main(int argc, char **argv)
     ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);//切换
     ros::Subscriber sub_cam_switch = n.subscribe("/vins_cam_switch", 100, cam_switch_callback);
 
+
+    //新增订阅者，来订阅event camera的信息！！！建议查看ESVO以及Acr*
+
     //将进行同步处理
     std::thread sync_thread{sync_process};//主要是对双目进行处理的，因为双目的时候，两个camera的线程不能差太大，不然没有意义
     ros::spin();//这是一直在执行的，阻塞式的，一有消息就继续触发，而如果使用spinonce则只调用一次

@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3) #最小版本号
 project(vins)  #项目名字
+# project(evio)  #项目名字
 
 set(CMAKE_BUILD_TYPE "Release")  #编译的类型
 set(CMAKE_CXX_FLAGS "-std=c++11")  #采用的c++标准
