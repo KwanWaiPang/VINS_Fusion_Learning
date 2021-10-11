@@ -38,6 +38,13 @@ class FeatureTracker
 public:
     FeatureTracker();
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> trackImage(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
+    // ########################################################  gwphku
+    map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> trackEvent(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
+    void goodevent_FeaturesToTrack( InputArray image, OutputArray corners,
+                                     int maxCorners, double qualityLevel, double minDistance,
+                                     InputArray mask = noArray(), int blockSize = 3,
+                                     bool useHarrisDetector = false, double k = 0.04 );
+// ########################################################                                     
     void setMask();
     void readIntrinsicParameter(const vector<string> &calib_file);
     void showUndistortion(const string &name);

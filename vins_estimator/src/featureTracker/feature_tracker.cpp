@@ -10,6 +10,7 @@
  *******************************************************/
 
 #include "feature_tracker.h"
+#include "acd/arc_star_detector.h"
 
 bool FeatureTracker::inBorder(const cv::Point2f &pt)
 {
@@ -97,9 +98,186 @@ double FeatureTracker::distance(cv::Point2f &pt1, cv::Point2f &pt2)
     return sqrt(dx * dx + dy * dy);
 }
 
+// #####################################gwphku
+// cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);//改写
+//源码分析可以参考：https://blog.csdn.net/jaych/article/details/51203841
+// 也可能需要参考ESVO看如何对event做tracking了
+void FeatureTracker::goodevent_FeaturesToTrack( InputArray image, OutputArray corners,
+                                     int maxCorners, double qualityLevel, double minDistance,
+                                     InputArray mask = noArray(), int blockSize = 3,
+                                     bool useHarrisDetector = false, double k = 0.04 )
+                                     {
+
+                                     }
+
+// ###################################################
+
 // 对应的定义一个track event的函数来跟踪event！！！！
 // #################################gwphku
+//进入event detection and tracking
+map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEvent(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1)
+{
+    TicToc t_r;//没怎么用，应该是时间？
+    cur_time = _cur_time;
+    cur_img = _img;
+    row = cur_img.rows;
+    col = cur_img.cols;
+    cv::Mat rightImg = _img1;
+  
+    cur_pts.clear();//当前帧的特征点清哦
 
+    if (prev_pts.size() > 0)//若上一帧的特征点大于0则实行
+    {
+        TicToc t_o;
+        vector<uchar> status;//定义一个向量，用于剔除外点
+        vector<float> err;
+        if(hasPrediction)//若已经进行了预测，则执行。（一开始是false的，只有当执行了setPrediction，才是true）
+        {
+            cur_pts = predict_pts;//若一开始有预测的点的话，就先用预测的点
+            cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 1, 
+            cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
+            
+            int succ_num = 0;
+            for (size_t i = 0; i < status.size(); i++)
+            {
+                if (status[i])
+                    succ_num++;//看看可以成功跟踪到多少个点
+            }
+            if (succ_num < 10)//如果少于10个点，那么继续
+               cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 3);
+               //里面的“3”是图像金字塔相关的参数。
+               //maxLevel ：基于0的最大金字塔等级数;如果设置为0，则不使用金字塔（单级），如果设置为1，则使用两个级别，
+               //依此类推;如果将金字塔传递给输入，那么算法将使用与金字塔一样多的级别，但不超过maxLevel。
+        }
+        else
+            cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 3);//通过光流来计算。
+            //prev_img, cur_img, prev_pts,三个都是前面给定的
+            //所以应该得到的是cur_pts，status就是匹配的效果
+            //cur_pts输出二维点的矢量（具有单精度浮点坐标），包含第二图像中输入特征的计算新位置;
+            // 当传递OPTFLOW_USE_INITIAL_FLOW标志时，向量cur_pts必须与输入中的大小相同。（但此处没有输入，前面根后面有）
+            //status输出状态向量（无符号字符）;如果找到相应特征的流，则向量的每个元素设置为1，否则设置为0。
+            //err ：输出错误的矢量; 向量的每个元素都设置为相应特征的错误，错误度量的类型可以在flags参数中设置; 如果未找到流，则未定义错误（使用status参数查找此类情况）。
+
+        // reverse check
+        if(FLOW_BACK)//这是读入的参数，是否需要进行二次的光流检测，一般都选了1
+        {//perform forward and backward optical flow to improve feature tracking accuracy
+            vector<uchar> reverse_status;
+            vector<cv::Point2f> reverse_pts = prev_pts;
+            cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 1, 
+            cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
+            //cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 3); 
+            //通过映射回去，再次得到输出状态向量reverse_status，然后起到double check的作用最终得到status
+            for(size_t i = 0; i < status.size(); i++)
+            {
+                if(status[i] && reverse_status[i] && distance(prev_pts[i], reverse_pts[i]) <= 0.5)
+                {
+                    status[i] = 1;
+                }
+                else
+                    status[i] = 0;
+            }
+        }
+        
+        for (int i = 0; i < int(cur_pts.size()); i++)
+            if (status[i] && !inBorder(cur_pts[i]))
+                status[i] = 0;
+        reduceVector(prev_pts, status);//外点剔除，剔除无用的特征点后，还是得到prev_pts
+        reduceVector(cur_pts, status);
+        reduceVector(ids, status);
+        reduceVector(track_cnt, status);
+        ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
+        //printf("track cnt %d\n", (int)ids.size());
+    }
+
+    for (auto &n : track_cnt)////每个特征点被连续追踪到的次数
+        n++;//上面已经追踪到了，把被追踪的次数++
+
+    if (1)//每一帧都会执行的角点检测与跟踪
+    {
+        //rejectWithF();
+        ROS_DEBUG("set mask begins");
+        TicToc t_m;
+        setMask();//先把mask设置了
+        ROS_DEBUG("set mask costs %fms", t_m.toc());
+
+        ROS_DEBUG("detect feature begins");
+        TicToc t_t;
+        int n_max_cnt = MAX_CNT - static_cast<int>(cur_pts.size());
+        if (n_max_cnt > 0)
+        {
+            if(mask.empty())
+                cout << "mask is empty " << endl;
+            if (mask.type() != CV_8UC1)
+                cout << "mask type wrong " << endl;
+
+            FeatureTracker::goodevent_FeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);
+            // cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);//通过这个来提取特征。
+            // //Shi-Tomasi角点检测法。对于event camera的话，换为event camera的特征提取方法即可。刚开始调试的时候，应该将图片以及event的角点同时输出观测
+            // //通过设置一个mask，来实现被提取角点的较均匀分布
+            // //维护一个最大数量，光流一直跟踪，若更丢后，再补齐对应数量
+            // //输出的角点cv::OutputArray corners, n_pts
+
+            // //MAX_CNT - cur_pts.size()是最大的角点数目。就相当于目前的角点已有了，然后检测n_pts个，+上现有的等于设置的最大的
+            // //MIN_DIST，最小距离，小于此距离的点忽略
+            // //cv::InputArray mask = noArray(), // mask=0的点忽略
+        }
+        else
+            n_pts.clear();//这个是如果点不够的时候，额外再检测的
+        ROS_DEBUG("detect feature costs: %f ms", t_t.toc());
+
+        for (auto &p : n_pts)
+        {
+            cur_pts.push_back(p);//把上面检测的n_pts push到cur_pts中
+            ids.push_back(n_id++);
+            track_cnt.push_back(1);
+        }
+        //printf("feature cnt after add %d\n", (int)ids.size());
+    }
+
+//通过函数undistortedPts以及camera的模型。进行去畸变。对单独的图像进行去畸变
+//对于event camera，可能就是camera[2],对于额外的camera需要怎么定义要仔细看清楚
+    cur_un_pts = undistortedPts(cur_pts, m_camera[0]);//对当前检测到的角点进行去畸变的处理，得到当前帧在归一化平面上的特征点
+    pts_velocity = ptsVelocity(ids, cur_un_pts, cur_un_pts_map, prev_un_pts_map);//特征点在成像平面上的速度
+
+    if(SHOW_TRACK)//读入参数是否show跟踪，如果是的话，就运行下面函数，将特征点显示出来！
+        drawTrack(cur_img, rightImg, ids, cur_pts, cur_right_pts, prevLeftPtsMap);
+
+//执行完后，将当前帧的一些数据变为上一帧
+    prev_img = cur_img;
+    prev_pts = cur_pts;
+    prev_un_pts = cur_un_pts;
+    prev_un_pts_map = cur_un_pts_map;
+    prev_time = cur_time;
+    hasPrediction = false;//将进行预测设置为false
+
+    prevLeftPtsMap.clear();
+    for(size_t i = 0; i < cur_pts.size(); i++)
+        prevLeftPtsMap[ids[i]] = cur_pts[i];
+
+    map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;//创建一个特征帧，最终要返回的
+    for (size_t i = 0; i < ids.size(); i++)
+    {
+        int feature_id = ids[i];//特征点的id
+        double x, y ,z;
+        x = cur_un_pts[i].x;//特征点在归一化平面的x
+        y = cur_un_pts[i].y;
+        z = 1;//归一化平面
+        double p_u, p_v;
+        p_u = cur_pts[i].x;//特征点在图像上的位置
+        p_v = cur_pts[i].y;
+        int camera_id = 0;
+        double velocity_x, velocity_y;
+        velocity_x = pts_velocity[i].x;//特征点在成像平面上的速度
+        velocity_y = pts_velocity[i].y;
+
+        Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
+        xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;//归一化平面上的点，成像平面上的点，成像平面上点的速度
+        featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);//把特征点的信息都加进去
+    }
+
+    //printf("feature track whole time %f\n", t_r.toc());
+    return featureFrame;//将特征帧返回
+}
 // ################################# 
 
 //最主要的函数trackImage，输入当前帧，如何获取新的tracking的image
