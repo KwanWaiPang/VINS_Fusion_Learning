@@ -32,8 +32,8 @@ queue<sensor_msgs::ImageConstPtr> img1_buf;
 
 //############################gwphku
 //Queue被定义成单端队列使用，Deque被定义成双端队列使用
-// using EventQueue = std::deque<dvs_msgs::Event>;
-// EventQueue events_left_buf; //event的buf
+using EventQueue = std::queue<dvs_msgs::EventArray>;
+EventQueue events_left_buf; //event的buf
 
 
 std::mutex m_buf;//相当于加了一个锁（互斥锁）。每次调用消息前，先锁上，把消息放到buf里面后再解锁
@@ -47,10 +47,12 @@ std::mutex m_buf;//相当于加了一个锁（互斥锁）。每次调用消息�
 //图像event0的回调
 void event0_callback(const dvs_msgs::EventArray::ConstPtr &msg)
 {
-    estimator.inputEVENT(msg);
+    // estimator.inputEVENT(msg);
 
     // m_buf.lock();
-    // events_left_buf.push(msg);
+    events_left_buf.push(msg);//直接将EventArray放入
+
+    //下面是把EventArray中的event放入
 	// for (const dvs_msgs::Event &e : msg->events)
 	// {
 	// 	events_left_buf.push_back(e);
@@ -62,20 +64,20 @@ void event0_callback(const dvs_msgs::EventArray::ConstPtr &msg)
 	// 	}
 	// 	events_left_buf[i + 1] = e;
 	// }    
-    // // m_buf.unlock();
+    // m_buf.unlock();
     //  estimator.inputEVENT(events_left_buf);//每个event就有时间输入故此不需要
     // clearEventQueue();
 }
 
-void clearEventQueue()
-	{
-		static constexpr size_t MAX_EVENT_QUEUE_LENGTH = 5000000;
-		if (events_left_buf.size() > MAX_EVENT_QUEUE_LENGTH)
-		{
-			size_t remove_events = events_left_buf.size() - MAX_EVENT_QUEUE_LENGTH;
-			events_left_buf.erase(events_left_buf.begin(), events_left_buf.begin() + remove_events);
-		}
-	}
+// void clearEventQueue()
+// 	{
+// 		static constexpr size_t MAX_EVENT_QUEUE_LENGTH = 5000000;
+// 		if (events_left_buf.size() > MAX_EVENT_QUEUE_LENGTH)
+// 		{
+// 			size_t remove_events = events_left_buf.size() - MAX_EVENT_QUEUE_LENGTH;
+// 			events_left_buf.erase(events_left_buf.begin(), events_left_buf.begin() + remove_events);
+// 		}
+// 	}
 
 
 //图像img0的回调
@@ -169,11 +171,23 @@ void sync_process()
                 time = img0_buf.front()->header.stamp.toSec();
                 header = img0_buf.front()->header;
                 image = getImageFromMsg(img0_buf.front());//之将把ros中图像消息的图像信息提取出来。然后放入estimator
-                img0_buf.pop();
+                img0_buf.pop();//删除它的第一个元素。每一步提取最早的一个，方进去后，删除
             }
             m_buf.unlock();
             if(!image.empty())
+            {
                 estimator.inputImage(time, image);//对输入的图像进行处理
+            }
+
+    // ################################################
+            dvs_msgs::EventArray events_left;
+            if(!events_left_buf.empty()){
+                    events_left=events_left_buf.front();//把最前的一个给到events_left
+                    events_left_buf.pop();//删除它的第一个元素。
+                }
+            if(!events_left.empty()){
+                estimator.inputEVENT(time, image, events_left);//将时间，imae，events_left_buf一起输入
+            }
         }
 
         //如果没有进入图像数据，却一直刷刷在跑，为此通过下面来休眠2ms，进而保证cpu占用率不至于一直被占用

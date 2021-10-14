@@ -242,7 +242,7 @@ void FeatureTracker::goodevent_FeaturesToTrack(const dvs_msgs::EventArray::Const
 // 对应的定义一个track event的函数来跟踪event！！！！
 // #################################gwphku
 //进入event detection and tracking
-map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEvent(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1, const dvs_msgs::EventArray::ConstPtr &event_msg)
+map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEvent(double _cur_time, const cv::Mat &_img, const dvs_msgs::EventArray::ConstPtr &event_msg, const cv::Mat &_img1)
 {//此处进来必须是event的dvs_msgs::EventArray::ConstPtr，这样才方便做extraction
     TicToc t_r;//没怎么用，应该是时间？
     cur_time = _cur_time;

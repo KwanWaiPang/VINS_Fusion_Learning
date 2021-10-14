@@ -160,16 +160,17 @@ void Estimator::changeSensorType(int use_imu, int use_stereo)
 
 // ###################################################gwphku
 //输入event之后就进行特征的跟踪
-void Estimator::inputEVENT(const dvs_msgs::EventArray::ConstPtr &msg)
+void Estimator::inputEVENT(double t, const cv::Mat &_img, const dvs_msgs::EventArray::ConstPtr &event)
 {
     inputImageCnt++;
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;//获取特征帧
     TicToc featureTrackerTime;
 
-    if(_img1.empty())//如果img1是空的，那就是单目的情况下
-        featureFrame = featureTracker.trackImage(t, _img);//进入看看如何做feature tracking的。通过featureTracker这个类中的trackImage函数，来实现特征的提取与跟踪的
-    else//若是双目
-        featureFrame = featureTracker.trackImage(t, _img, _img1);//双目的时候的特征在也是一样？只是执行双目的计算？
+    //对event数据流进行特征的提取与跟踪
+    featureFrame = featureTracker.trackImage(t, _img,event);
+
+    // featureFrame = featureTracker.trackImage(t, _img);
+    // map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEvent(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1, const dvs_msgs::EventArray::ConstPtr &event_msg)
     //printf("featureTracker time: %f\n", featureTrackerTime.toc());
 
     if (SHOW_TRACK)
