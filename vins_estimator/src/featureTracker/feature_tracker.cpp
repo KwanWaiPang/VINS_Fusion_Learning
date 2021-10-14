@@ -190,7 +190,7 @@ void FeatureTracker::goodevent_FeaturesToTrack(const dvs_msgs::EventArray::Const
 {
 
     const int n_event = event_msg->events.size();//进行event的计数，然后输出
-    ROS_INFO("n_event:%d",n_event);
+    // ROS_INFO("n_event:%d",n_event);//已经验证成功读入event
 
      if (n_event == 0) {
           cout << "event is empty " << endl;
@@ -213,15 +213,20 @@ void FeatureTracker::goodevent_FeaturesToTrack(const dvs_msgs::EventArray::Const
     corner_msg.header = event_msg->header;
     corner_msg.width = event_msg->width;
     corner_msg.height = event_msg->height;
-    ROS_INFO("width:%d,height:%d", corner_msg.width,corner_msg.height);//长宽高
+    // ROS_INFO("width:%d,height:%d", corner_msg.width,corner_msg.height);//长宽也没有问题
 
     // acd::ArcStarDetector detector = acd::ArcStarDetector((int) corner_msg.width, (int) corner_msg.height );//定义一个detector作为变量
   acd::ArcStarDetector detector = acd::ArcStarDetector();
   int ncorners = 0;
 
   for (const auto& e : event_msg->events) {
+
+        //  ROS_INFO("event_t:%d,event_x:%d,event_y:%d,,event_p:%d",e.ts.toSec(),e.x, e.y,e.polarity);
+
       // Unroll event array and detect Corners
     if (detector.isCorner(e.ts.toSec(), e.x, e.y, e.polarity)) {
+
+        ROS_INFO("here!!!!!!!!!");
       corner_msg.events.push_back(e);
       
       //把xy弄到n_pts中
@@ -230,9 +235,10 @@ void FeatureTracker::goodevent_FeaturesToTrack(const dvs_msgs::EventArray::Const
         n_pts.push_back(cv::Point2f((float)e.x, (float)e.y));
         // ncorners++;//计算corners数目，若大于一定值，则退出
         // if( maxCorners > 0 && (int)ncorners == maxCorners )  
-        //     break;        
+        //     break;     
     }
   }
+  ROS_INFO("the size of the n_pts:%d", n_pts.size());   
 //   const int n_corner = corner_msg.events.size();//定义一个不能被改变的int，
 }
 
@@ -333,33 +339,35 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEv
         ROS_DEBUG("detect event feature begins");
         TicToc t_t;
         int n_max_cnt = MAX_CNT - static_cast<int>(cur_pts.size());//离最大的特征点，还有多少个点
-        if (n_max_cnt > 0)//如果还不满足最大的特征点的要求，则进行ARC*特征点检测
-        {
-            if(mask.empty())
-                cout << "mask is empty " << endl;
-            if (mask.type() != CV_8UC1)
-                cout << "mask type wrong " << endl;
+        // if (n_max_cnt > 0)//如果还不满足最大的特征点的要求，则进行ARC*特征点检测
+        // {
+        //     if(mask.empty())
+        //         cout << "mask is empty ??? " << endl;
+        //     if (mask.type() != CV_8UC1)
+        //         cout << "mask type wrong " << endl;
 
-            FeatureTracker::goodevent_FeaturesToTrack(event_msg, corner_msg,n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);//定义角点检测
+        //     FeatureTracker::goodevent_FeaturesToTrack(event_msg, corner_msg,n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);//定义角点检测
             
-            // cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);//通过这个来提取特征。
-            // //Shi-Tomasi角点检测法。对于event camera的话，换为event camera的特征提取方法即可。刚开始调试的时候，应该将图片以及event的角点同时输出观测
-            // //通过设置一个mask，来实现被提取角点的较均匀分布
-            // //维护一个最大数量，光流一直跟踪，若更丢后，再补齐对应数量
-            // //输出的角点cv::OutputArray corners, n_pts
-            // //MAX_CNT - cur_pts.size()是最大的角点数目。就相当于目前的角点已有了，然后检测n_pts个，+上现有的等于设置的最大的
-            // //MIN_DIST，最小距离，小于此距离的点忽略
-            // //cv::InputArray mask = noArray(), // mask=0的点忽略
+        //     // cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);//通过这个来提取特征。
+        //     // //Shi-Tomasi角点检测法。对于event camera的话，换为event camera的特征提取方法即可。刚开始调试的时候，应该将图片以及event的角点同时输出观测
+        //     // //通过设置一个mask，来实现被提取角点的较均匀分布
+        //     // //维护一个最大数量，光流一直跟踪，若更丢后，再补齐对应数量
+        //     // //输出的角点cv::OutputArray corners, n_pts
+        //     // //MAX_CNT - cur_pts.size()是最大的角点数目。就相当于目前的角点已有了，然后检测n_pts个，+上现有的等于设置的最大的
+        //     // //MIN_DIST，最小距离，小于此距离的点忽略
+        //     // //cv::InputArray mask = noArray(), // mask=0的点忽略
 
-            //n_pts（是一个vector<cv::Point2f>且为输出的角点cv::OutputArray corners）已经获取了
-                //  //接下来需要将cur_event_msg转换为cur_img（cv::Mat ）
-                // FeatureTracker::change_event2CVMat(event_msg,  cur_event_msg, cur_img);
-                // //  FeatureTracker::change_event2CVMat(const dvs_msgs::EventArray::ConstPtr &event_msg, dvs_msgs::EventArray cur_event_msg, cv::Mat cur_img);
-                // //   n_pts;//是一个vector<cv::Point2f>且为输出的角点cv::OutputArray corners
-        }
-        else
-            n_pts.clear();//若点是够的，那么就清空
-        ROS_DEBUG("detect feature costs: %f ms", t_t.toc());
+        //     //n_pts（是一个vector<cv::Point2f>且为输出的角点cv::OutputArray corners）已经获取了
+        //         //  //接下来需要将cur_event_msg转换为cur_img（cv::Mat ）
+        //         // FeatureTracker::change_event2CVMat(event_msg,  cur_event_msg, cur_img);
+        //         // //  FeatureTracker::change_event2CVMat(const dvs_msgs::EventArray::ConstPtr &event_msg, dvs_msgs::EventArray cur_event_msg, cv::Mat cur_img);
+        //         // //   n_pts;//是一个vector<cv::Point2f>且为输出的角点cv::OutputArray corners
+        // }
+        // else
+        //     n_pts.clear();//若点是够的，那么就清空
+        // ROS_DEBUG("detect feature costs: %f ms", t_t.toc());
+
+         FeatureTracker::goodevent_FeaturesToTrack(event_msg, corner_msg,n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);//定义角点检测
 
         for (auto &p : n_pts)
         {
@@ -367,11 +375,13 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEv
             ids.push_back(n_id++);
             track_cnt.push_back(1);
         }
+        n_pts.clear();
         //printf("feature cnt after add %d\n", (int)ids.size());
     }
 
 //通过函数undistortedPts以及camera的模型。进行去畸变。对单独的图像进行去畸变
 //对于event camera，可能就是camera[2],对于额外的camera需要怎么定义要仔细看清楚
+   ROS_INFO("before cur_un_pts");
     cur_un_pts = undistortedPts(cur_pts, m_camera[0]);//对当前检测到的角点进行去畸变的处理，得到当前帧在归一化平面上的特征点
     pts_velocity = ptsVelocity(ids, cur_un_pts, cur_un_pts_map, prev_un_pts_map);//特征点在成像平面上的速度。
     // 里面的东西都是根cur_pts（成像平面上的特征点有关，不需要处理吧）

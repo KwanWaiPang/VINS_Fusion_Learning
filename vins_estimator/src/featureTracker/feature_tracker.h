@@ -69,7 +69,7 @@ public:
     FeatureTracker();
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> trackImage(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
     // ########################################################  gwphku  函数
-    map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> trackEvent(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1, const dvs_msgs::EventArray::ConstPtr& event_msg);//const dvs_msgs::EventArray::ConstPtr& msg
+   map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> trackEvent(double _cur_time, const cv::Mat &_img, const dvs_msgs::EventArray::ConstPtr &event_msg, const cv::Mat &_img1 = cv::Mat());//const dvs_msgs::EventArray::ConstPtr& msg
   void goodevent_FeaturesToTrack(const dvs_msgs::EventArray::ConstPtr &event_msg, dvs_msgs::EventArray corner_msg,  vector<cv::Point2f>  n_pts, int need_num, int para, int MIN_DIST,  cv::Mat mask);
   void change_event2CVMat(const dvs_msgs::EventArray::ConstPtr &event_msg, dvs_msgs::EventArray cur_event_msg, cv::Mat cur_img);
   void init(int width, int height);

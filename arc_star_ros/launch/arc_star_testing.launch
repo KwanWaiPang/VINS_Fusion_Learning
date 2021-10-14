@@ -6,7 +6,7 @@
   <!-- 如果参数rosbag_flag是等于0，则运行davis driver -->
   <group if="$(eval arg('rosbag_flag')==0)">
       <!-- Publish the calibration -->
-  <include file="$(find esvo_time_surface)/launch/rosbag_launcher/hkust/my_calib_info.launch" />
+  <include file="$(find esvo_time_surface)/launch/rosbag_launcher/hku/my_calib_info.launch" />
 
 
 

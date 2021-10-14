@@ -32,8 +32,8 @@ queue<sensor_msgs::ImageConstPtr> img1_buf;
 
 //############################gwphku
 //Queue被定义成单端队列使用，Deque被定义成双端队列使用
-using EventQueue = std::queue<dvs_msgs::EventArray>;
-EventQueue events_left_buf; //event的buf
+using EventQueue1 = std::queue<dvs_msgs::EventArray::ConstPtr>;
+EventQueue1 events_left_buf; //event的buf
 
 
 std::mutex m_buf;//相当于加了一个锁（互斥锁）。每次调用消息前，先锁上，把消息放到buf里面后再解锁
@@ -174,20 +174,21 @@ void sync_process()
                 img0_buf.pop();//删除它的第一个元素。每一步提取最早的一个，方进去后，删除
             }
             m_buf.unlock();
-            if(!image.empty())
+            if(!image.empty())///先不运行
             {
                 estimator.inputImage(time, image);//对输入的图像进行处理
             }
 
-    // ################################################
-            dvs_msgs::EventArray events_left;
-            if(!events_left_buf.empty()){
-                    events_left=events_left_buf.front();//把最前的一个给到events_left
-                    events_left_buf.pop();//删除它的第一个元素。
-                }
-            if(!events_left.empty()){
-                estimator.inputEVENT(time, image, events_left);//将时间，imae，events_left_buf一起输入
-            }
+    // ################################################下面进行event的处理，某种程度上，根image无关
+            // dvs_msgs::EventArray events_left;
+            // if(!events_left_buf.empty()){
+            //         // events_left=events_left_buf.front();//把最前的一个给到events_left          没有等号的操作
+            //         estimator.inputEVENT(time, image, events_left_buf.front());
+            //         events_left_buf.pop();//删除它的第一个元素。
+            //     }
+            // if(!events_left.){
+            //     estimator.inputEVENT(time, image, events_left);//将时间，imae，events_left_buf一起输入
+            // }
         }
 
         //如果没有进入图像数据，却一直刷刷在跑，为此通过下面来休眠2ms，进而保证cpu占用率不至于一直被占用
@@ -332,7 +333,7 @@ int main(int argc, char **argv)
     }
     
     // ##################################gwphku
-    ros::Subscriber sub_img0 = n.subscribe(EVENT0_TOPIC, 0, event0_callback);//订阅event
+    ros::Subscriber sub_event0 = n.subscribe(EVENT0_TOPIC, 0, event0_callback);//订阅event
 // ########################################################################
 
     //下面这三个先不看，没啥意义

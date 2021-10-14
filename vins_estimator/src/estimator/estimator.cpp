@@ -167,7 +167,7 @@ void Estimator::inputEVENT(double t, const cv::Mat &_img, const dvs_msgs::EventA
     TicToc featureTrackerTime;
 
     //对event数据流进行特征的提取与跟踪
-    featureFrame = featureTracker.trackImage(t, _img,event);
+    featureFrame = featureTracker.trackEvent(t, _img,event);
 
     // featureFrame = featureTracker.trackImage(t, _img);
     // map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEvent(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1, const dvs_msgs::EventArray::ConstPtr &event_msg)

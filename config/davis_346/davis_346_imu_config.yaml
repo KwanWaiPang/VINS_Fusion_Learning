@@ -11,7 +11,7 @@ image0_topic: "/dvs/image_raw"
 image1_topic: "/camera/infra2/image_rect_raw"
 output_path: "/home/dji/output/"
 
-event0_topic: "/dvs/image_raw"
+event0_topic: "/dvs/events"
 event1_topic: ""
 
 cam0_calib: "davis346_0.yaml"

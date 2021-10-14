@@ -8,7 +8,8 @@ rosrun vins vins_node ~/catkin_ws_dvs/src/VINS_Fusion_Learning/config/davis_346/
 3. rosNodeTest.cpp加入该加入的依赖以及topic
 4. estimator.cpp
 
-
+先实施d435i
+1. roslaunch esvo_core camera.launch
 
 
 
