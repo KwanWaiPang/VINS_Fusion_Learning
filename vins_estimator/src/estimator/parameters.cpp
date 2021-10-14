@@ -40,6 +40,7 @@ int USE_IMU;
 int MULTIPLE_THREAD;
 map<int, Eigen::Vector3d> pts_gt;
 std::string IMAGE0_TOPIC, IMAGE1_TOPIC;
+std::string EVENT0_TOPIC, EVENT1_TOPIC;////加入event camera的topic
 std::string FISHEYE_MASK;
 std::vector<std::string> CAM_NAMES;
 int MAX_CNT;
@@ -89,6 +90,8 @@ void readParameters(std::string config_file)
 // opencv打开了文件后，读入。而变量在前面都定义为全局变量，声明在对应的h
     fsSettings["image0_topic"] >> IMAGE0_TOPIC;
     fsSettings["image1_topic"] >> IMAGE1_TOPIC;
+    fsSettings["event0_topic"] >> EVENT0_TOPIC;//读入event
+    fsSettings["event1_topic"] >> EVENT1_TOPIC;//读入event
     MAX_CNT = fsSettings["max_cnt"];
     MIN_DIST = fsSettings["min_dist"];
     F_THRESHOLD = fsSettings["F_threshold"];

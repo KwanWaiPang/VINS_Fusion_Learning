@@ -30,6 +30,11 @@ queue<sensor_msgs::PointCloudConstPtr> feature_buf;
 queue<sensor_msgs::ImageConstPtr> img0_buf;
 queue<sensor_msgs::ImageConstPtr> img1_buf;
 
+//############################gwphku
+//Queue被定义成单端队列使用，Deque被定义成双端队列使用
+// using EventQueue = std::deque<dvs_msgs::Event>;
+// EventQueue events_left_buf; //event的buf
+
 
 std::mutex m_buf;//相当于加了一个锁（互斥锁）。每次调用消息前，先锁上，把消息放到buf里面后再解锁
 //参考：https://blog.csdn.net/qq_39736982/article/details/82348672
@@ -37,6 +42,41 @@ std::mutex m_buf;//相当于加了一个锁（互斥锁）。每次调用消息�
 // 但通过“锁”就将资源的访问变成互斥操作，而后与时间有关的错误也不会再产生了。
 // 互斥锁实质上是操作系统提供的一把“建议锁”（又称“协同锁”），建议程序中有多线程访问共享资源的时候使用该机制。但，并没有强制限定。
 // 因此，即使有了mutex，如果有线程不按规则来访问数据，依然会造成数据混乱。
+
+
+//图像event0的回调
+void event0_callback(const dvs_msgs::EventArray::ConstPtr &msg)
+{
+    estimator.inputEVENT(msg);
+
+    // m_buf.lock();
+    // events_left_buf.push(msg);
+	// for (const dvs_msgs::Event &e : msg->events)
+	// {
+	// 	events_left_buf.push_back(e);
+	// 	int i = events_left_buf.size() - 2;
+	// 	while (i >= 0 && events_left_buf[i].ts > e.ts) // we may have to sort the queue, just in case the raw event messages do not come in a chronological order.
+	// 	{
+	// 		events_left_buf[i + 1] = events_left_buf[i];
+	// 		i--;
+	// 	}
+	// 	events_left_buf[i + 1] = e;
+	// }    
+    // // m_buf.unlock();
+    //  estimator.inputEVENT(events_left_buf);//每个event就有时间输入故此不需要
+    // clearEventQueue();
+}
+
+void clearEventQueue()
+	{
+		static constexpr size_t MAX_EVENT_QUEUE_LENGTH = 5000000;
+		if (events_left_buf.size() > MAX_EVENT_QUEUE_LENGTH)
+		{
+			size_t remove_events = events_left_buf.size() - MAX_EVENT_QUEUE_LENGTH;
+			events_left_buf.erase(events_left_buf.begin(), events_left_buf.begin() + remove_events);
+		}
+	}
+
 
 //图像img0的回调
 void img0_callback(const sensor_msgs::ImageConstPtr &img_msg)
@@ -276,6 +316,11 @@ int main(int argc, char **argv)
     {
         sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
     }
+    
+    // ##################################gwphku
+    ros::Subscriber sub_img0 = n.subscribe(EVENT0_TOPIC, 0, event0_callback);//订阅event
+// ########################################################################
+
     //下面这三个先不看，没啥意义
     ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);//重启
     ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);//切换
