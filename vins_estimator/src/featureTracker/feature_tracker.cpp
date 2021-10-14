@@ -10,7 +10,10 @@
  *******************************************************/
 
 #include "feature_tracker.h"
-#include "acd/arc_star_detector.h"
+#include "../arc_star/acd/arc_star_detector.h"
+#include <cv_bridge/cv_bridge.h>
+// #include "../time_surface/TimeSurface.h"
+// #include "../time_surface/TicToc.h"
 
 bool FeatureTracker::inBorder(const cv::Point2f &pt)
 {
@@ -52,6 +55,12 @@ FeatureTracker::FeatureTracker()
     stereo_cam = 0;
     n_id = 0;
     hasPrediction = false;//初始化的时候，将进行预测设置为false
+
+    // #####################gwphku
+    bool bSensorInitialized_=false;//用于生成TS或者可以理解为将event转为frame
+    // if(pEventQueueMat_)
+    // pEventQueueMat_->clear();
+  sensor_size_ = cv::Size(0,0);
 }
 
 //设置mask
@@ -105,31 +114,149 @@ double FeatureTracker::distance(cv::Point2f &pt1, cv::Point2f &pt2)
 //time surface的数据形式为dvs_msgs::EventArray
 //arc*检测出来的corner_msg是dvs_msgs::EventArray 。两者是等效的。
 //关键看看esvo中如何做tracking
-void FeatureTracker::goodevent_FeaturesToTrack( InputArray image, OutputArray corners,
-                                     int maxCorners, double qualityLevel, double minDistance,
-                                     InputArray mask = noArray(), int blockSize = 3,
-                                     bool useHarrisDetector = false, double k = 0.04 )
-                                     {
 
-                                     }
+//esvo中发布的time_surface是sensor_msgs/Image，里面处理的所有timesurface都是sensor_msgs::ImageConstPtr，基本的pose计算也是。
+// 所以需要用函数把dvs_msgs::EventArray 
+// void FeatureTracker::goodevent_FeaturesToTrack( InputArray image, OutputArray corners,
+//                                      int maxCorners, double qualityLevel, double minDistance,
+//                                      InputArray mask = noArray(), int blockSize = 3,
+//                                      bool useHarrisDetector = false, double k = 0.04 )
+//                                      {
+
+//                                      }
+
+void FeatureTracker::change_event2CVMat(const dvs_msgs::EventArray::ConstPtr &event_msg, dvs_msgs::EventArray cur_event_msg,  cv::Mat cur_img)
+{
+
+      ///顺便生成cur_event_msg
+    cur_event_msg.header = event_msg->header;
+    cur_event_msg.width = event_msg->width;
+    cur_event_msg.height = event_msg->height; 
+    for (const auto& e : event_msg->events) {
+      cur_event_msg.events.push_back(e);
+    }
+
+    //首先通过函数eventsCallback将event_msg放入pEventQueueMat_类中
+    //pEventQueueMat_类是一个指针类，里面包含了：长宽、队列的长度（queueLen_）和一个EventQueue（using EventQueue = std::deque<dvs_msgs::Event>;）
+    //pEventQueueMat_类可用于将event转换为Mat
+    // esvo_time_surface::TimeSurface::eventsCallback(event_msg);//实现将事件数据放到pEventQueueMat_类中，不可以使用eventsCallback，由于其是私有成员函数
+
+
+  if(!bSensorInitialized_)//看一下是否初始化了，如果没有就进行初始化pEventQueueMat_
+   FeatureTracker::init(event_msg->width, event_msg->height);//顺便对event 序列 Mat指针进行初始化
+
+   cv_bridge::CvImage cv_image;
+  if (event_msg->events.size() > 0)//如果有event
+    {
+      cv_image.header.stamp = event_msg->events[event_msg->events.size()/2].ts;
+    }
+
+    cv_image.encoding = "bgr8";
+    cv_image.image = cv::Mat(event_msg->height, event_msg->width, CV_8UC3);
+    cv_image.image = cv::Scalar(0,0,0);//分别设置为0，三个通道
+
+     for (int i = 0; i < event_msg->events.size(); ++i)
+      {
+        const int x = event_msg->events[i].x;
+        const int y = event_msg->events[i].y;
+
+        cv_image.image.at<cv::Vec3b>(cv::Point(x, y)) = (
+            event_msg->events[i].polarity == true ? cv::Vec3b(255, 0, 0) : cv::Vec3b(0, 0, 255));
+      }
+
+      cur_img=cv_image.image;  //赋值给cur_img
+  //已经得到放入了pEventQueueMat_的event了
+//   cv::Mat event_image_map;
+//   event_image_map = cv::Mat::zeros(sensor_size_, CV_64F);
+//   // Loop through all pixel coordinates
+//     for(int y=0; y<sensor_size_.height; ++y){
+//         for(int x=0; x<sensor_size_.width; ++x){
+//             event_image_map.at<double>(y,x)=
+//         }
+//     }
+}
+
+
+void FeatureTracker::init(int width, int height)
+{
+  sensor_size_ = cv::Size(width, height);
+  bSensorInitialized_ = true;//只进行初始化一次
+//   pEventQueueMat_.reset(new EventQueueMat(width, height, max_event_queue_length_));
+//   ROS_INFO("Sensor size: (%d x %d)", sensor_size_.width, sensor_size_.height);
+}
+
+
+void FeatureTracker::goodevent_FeaturesToTrack(const dvs_msgs::EventArray::ConstPtr &event_msg, dvs_msgs::EventArray corner_msg,  vector<cv::Point2f>  n_pts, int maxCorners, int para, int MIN_DIST,  cv::Mat mask)
+{
+
+    const int n_event = event_msg->events.size();//进行event的计数，然后输出
+    ROS_INFO("n_event:%d",n_event);
+
+     if (n_event == 0) {
+          cout << "event is empty " << endl;
+          }
+
+    //EventArray相对于Event的区别主要是：
+    // Header header
+    // uint32 height         # image height, that is, number of rows
+    // uint32 width          # image width, that is, number of columns
+    // # an array of events
+    // Event[] events
+
+    // # A DVS event
+    // uint16 x
+    // uint16 y
+    // time ts
+    // bool polarity
+
+    // dvs_msgs::EventArray corner_msg;//形参传入corner_msg
+    corner_msg.header = event_msg->header;
+    corner_msg.width = event_msg->width;
+    corner_msg.height = event_msg->height;
+    ROS_INFO("width:%d,height:%d", corner_msg.width,corner_msg.height);//长宽高
+
+    // acd::ArcStarDetector detector = acd::ArcStarDetector((int) corner_msg.width, (int) corner_msg.height );//定义一个detector作为变量
+  acd::ArcStarDetector detector = acd::ArcStarDetector();
+  int ncorners = 0;
+
+  for (const auto& e : event_msg->events) {
+      // Unroll event array and detect Corners
+    if (detector.isCorner(e.ts.toSec(), e.x, e.y, e.polarity)) {
+      corner_msg.events.push_back(e);
+      
+      //把xy弄到n_pts中
+      //查看goodFeaturesToTrack函数的定义在imgproc文件的featureselect.cpp（https://blog.csdn.net/xdfyoga1/article/details/44175637）
+    //  corners.push_back(Point2f((float)x, (float)y));
+        n_pts.push_back(cv::Point2f((float)e.x, (float)e.y));
+        // ncorners++;//计算corners数目，若大于一定值，则退出
+        // if( maxCorners > 0 && (int)ncorners == maxCorners )  
+        //     break;        
+    }
+  }
+//   const int n_corner = corner_msg.events.size();//定义一个不能被改变的int，
+}
+
 
 // ###################################################
 
 // 对应的定义一个track event的函数来跟踪event！！！！
 // #################################gwphku
 //进入event detection and tracking
-map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEvent(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1)
-{
+map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEvent(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1, const dvs_msgs::EventArray::ConstPtr &event_msg)
+{//此处进来必须是event的dvs_msgs::EventArray::ConstPtr，这样才方便做extraction
     TicToc t_r;//没怎么用，应该是时间？
     cur_time = _cur_time;
-    cur_img = _img;
+    cur_img = _img;//直接image frame输入。
+    //或者把所谓的cur_img全部改为event的image
+    FeatureTracker::change_event2CVMat(event_msg, cur_event_msg,  cur_img);//已经获取到image了
+
     row = cur_img.rows;
     col = cur_img.cols;
     cv::Mat rightImg = _img1;
-  
-    cur_pts.clear();//当前帧的特征点清哦
 
-    if (prev_pts.size() > 0)//若上一帧的特征点大于0则实行
+    cur_pts.clear();//当前帧的特征点清0，是一个vector<cv::Point2f>，可以通过Mat赋值。检测到的角点转到cv::Mat再转到这个上
+
+    if (prev_pts.size() > 0)//若上一帧的特征点大于0则实行LK光流跟踪
     {
         TicToc t_o;
         vector<uchar> status;//定义一个向量，用于剔除外点
@@ -138,7 +265,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEv
         {
             cur_pts = predict_pts;//若一开始有预测的点的话，就先用预测的点
             cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 1, 
-            cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
+            cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);//这是通过img来进行跟踪的
             
             int succ_num = 0;
             for (size_t i = 0; i < status.size(); i++)
@@ -203,29 +330,35 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEv
         setMask();//先把mask设置了
         ROS_DEBUG("set mask costs %fms", t_m.toc());
 
-        ROS_DEBUG("detect feature begins");
+        ROS_DEBUG("detect event feature begins");
         TicToc t_t;
-        int n_max_cnt = MAX_CNT - static_cast<int>(cur_pts.size());
-        if (n_max_cnt > 0)
+        int n_max_cnt = MAX_CNT - static_cast<int>(cur_pts.size());//离最大的特征点，还有多少个点
+        if (n_max_cnt > 0)//如果还不满足最大的特征点的要求，则进行ARC*特征点检测
         {
             if(mask.empty())
                 cout << "mask is empty " << endl;
             if (mask.type() != CV_8UC1)
                 cout << "mask type wrong " << endl;
 
-            FeatureTracker::goodevent_FeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);
+            FeatureTracker::goodevent_FeaturesToTrack(event_msg, corner_msg,n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);//定义角点检测
+            
             // cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);//通过这个来提取特征。
             // //Shi-Tomasi角点检测法。对于event camera的话，换为event camera的特征提取方法即可。刚开始调试的时候，应该将图片以及event的角点同时输出观测
             // //通过设置一个mask，来实现被提取角点的较均匀分布
             // //维护一个最大数量，光流一直跟踪，若更丢后，再补齐对应数量
             // //输出的角点cv::OutputArray corners, n_pts
-
             // //MAX_CNT - cur_pts.size()是最大的角点数目。就相当于目前的角点已有了，然后检测n_pts个，+上现有的等于设置的最大的
             // //MIN_DIST，最小距离，小于此距离的点忽略
             // //cv::InputArray mask = noArray(), // mask=0的点忽略
+
+            //n_pts（是一个vector<cv::Point2f>且为输出的角点cv::OutputArray corners）已经获取了
+                //  //接下来需要将cur_event_msg转换为cur_img（cv::Mat ）
+                // FeatureTracker::change_event2CVMat(event_msg,  cur_event_msg, cur_img);
+                // //  FeatureTracker::change_event2CVMat(const dvs_msgs::EventArray::ConstPtr &event_msg, dvs_msgs::EventArray cur_event_msg, cv::Mat cur_img);
+                // //   n_pts;//是一个vector<cv::Point2f>且为输出的角点cv::OutputArray corners
         }
         else
-            n_pts.clear();//这个是如果点不够的时候，额外再检测的
+            n_pts.clear();//若点是够的，那么就清空
         ROS_DEBUG("detect feature costs: %f ms", t_t.toc());
 
         for (auto &p : n_pts)
@@ -240,7 +373,8 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackEv
 //通过函数undistortedPts以及camera的模型。进行去畸变。对单独的图像进行去畸变
 //对于event camera，可能就是camera[2],对于额外的camera需要怎么定义要仔细看清楚
     cur_un_pts = undistortedPts(cur_pts, m_camera[0]);//对当前检测到的角点进行去畸变的处理，得到当前帧在归一化平面上的特征点
-    pts_velocity = ptsVelocity(ids, cur_un_pts, cur_un_pts_map, prev_un_pts_map);//特征点在成像平面上的速度
+    pts_velocity = ptsVelocity(ids, cur_un_pts, cur_un_pts_map, prev_un_pts_map);//特征点在成像平面上的速度。
+    // 里面的东西都是根cur_pts（成像平面上的特征点有关，不需要处理吧）
 
     if(SHOW_TRACK)//读入参数是否show跟踪，如果是的话，就运行下面函数，将特征点显示出来！
         drawTrack(cur_img, rightImg, ids, cur_pts, cur_right_pts, prevLeftPtsMap);

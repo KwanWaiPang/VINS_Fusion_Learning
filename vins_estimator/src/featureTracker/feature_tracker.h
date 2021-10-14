@@ -25,6 +25,33 @@
 #include "../estimator/parameters.h"
 #include "../utility/tic_toc.h"
 
+// ################
+// #include "../time_surface/TimeSurface.h"
+// #include "../time_surface/TicToc.h"
+#include "../arc_star/acd/arc_star_detector.h"
+#include <opencv2/calib3d/calib3d.hpp>
+#include <std_msgs/Float32.h>
+#include <glog/logging.h>
+#include <thread>
+#include "opencv2/core.hpp"
+
+#include <ros/ros.h>
+#include <std_msgs/Time.h>
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/image_encodings.h>
+#include <dynamic_reconfigure/server.h>
+#include <image_transport/image_transport.h>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <dvs_msgs/Event.h>
+#include <dvs_msgs/EventArray.h>
+#include <deque>
+#include <mutex>
+#include <Eigen/Eigen>
+// ################
+
 using namespace std;
 using namespace camodocal;
 using namespace Eigen;
@@ -33,17 +60,20 @@ bool inBorder(const cv::Point2f &pt);
 void reduceVector(vector<cv::Point2f> &v, vector<uchar> status);
 void reduceVector(vector<int> &v, vector<uchar> status);
 
+// ############################gwphku
+using EventQueue = std::deque<dvs_msgs::Event>;//定义的event队列。deque就先理解为高级的vector
+
 class FeatureTracker
 {
 public:
     FeatureTracker();
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> trackImage(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
-    // ########################################################  gwphku
-    map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> trackEvent(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
-    void goodevent_FeaturesToTrack( InputArray image, OutputArray corners,
-                                     int maxCorners, double qualityLevel, double minDistance,
-                                     InputArray mask = noArray(), int blockSize = 3,
-                                     bool useHarrisDetector = false, double k = 0.04 );
+    // ########################################################  gwphku  函数
+    map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> trackEvent(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1, const dvs_msgs::EventArray::ConstPtr& event_msg);//const dvs_msgs::EventArray::ConstPtr& msg
+  void goodevent_FeaturesToTrack(const dvs_msgs::EventArray::ConstPtr &event_msg, dvs_msgs::EventArray corner_msg,  vector<cv::Point2f>  n_pts, int need_num, int para, int MIN_DIST,  cv::Mat mask);
+  void change_event2CVMat(const dvs_msgs::EventArray::ConstPtr &event_msg, dvs_msgs::EventArray cur_event_msg, cv::Mat cur_img);
+  void init(int width, int height);
+
 // ########################################################                                     
     void setMask();
     void readIntrinsicParameter(const vector<string> &calib_file);
@@ -74,6 +104,16 @@ public:
     vector<cv::Point2f> n_pts;
     vector<cv::Point2f> predict_pts;
     vector<cv::Point2f> predict_pts_debug;
+
+// ########################################gwphku
+    dvs_msgs::EventArray cur_event_msg,prev_event_msg;//注意一下是const dvs_msgs::EventArray::ConstPtr 还是const dvs_msgs::EventArray
+    dvs_msgs::EventArray corner_msg; 
+
+//下面是用于把event转换到cv::mat的
+cv::Size sensor_size_;
+ bool bSensorInitialized_;//对pEventQueueMat_的大小进行初始化
+
+//#####################################################
     
     //成像平面的特征点
     vector<cv::Point2f> prev_pts, cur_pts, cur_right_pts;//上一帧的特征点，这一帧的特征点（左目），这一帧右目的特征点（双目的情况）
